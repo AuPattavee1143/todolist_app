@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:todolist_app/model/task_model.dart';
@@ -12,19 +13,21 @@ class EditTaskScreen extends StatefulWidget {
 }
 
 class _EditTaskScreenState extends State<EditTaskScreen> {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
   Database db = Database.myInstance;
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _dspController = TextEditingController();
-  final TextEditingController _dateController = TextEditingController();
-  DateTime? _selectedDate;
+  final TextEditingController _dateTimeController = TextEditingController();
+  DateTime? _selectedDateTime;
 
   @override
   void initState() {
     super.initState();
     _titleController.text = widget.task.title;
     _dspController.text = widget.task.dsp;
-    _selectedDate = widget.task.date;
-    _dateController.text = DateFormat('dd/MM/yyyy').format(_selectedDate!);
+    _selectedDateTime = widget.task.date;
+    _dateTimeController.text =
+        DateFormat('dd/MM/yyyy HH:mm').format(_selectedDateTime!);
   }
 
   @override
@@ -40,10 +43,7 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
               }
             },
             itemBuilder: (BuildContext context) => [
-              PopupMenuItem(
-                value: 'delete',
-                child: Text("ลบ"),
-              ),
+              PopupMenuItem(value: 'delete', child: Text("ลบ")),
             ],
           ),
         ],
@@ -57,7 +57,7 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
               controller: _titleController,
               decoration: InputDecoration(
                 labelText: 'Title',
-                prefixIcon: Icon(Icons.task)
+                prefixIcon: Icon(Icons.task),
               ),
             ),
             SizedBox(height: 8),
@@ -65,17 +65,18 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
               controller: _dspController,
               decoration: InputDecoration(
                 labelText: 'Description',
-                prefixIcon: Icon(Icons.notes)),
+                prefixIcon: Icon(Icons.notes),
+              ),
             ),
             SizedBox(height: 8),
             TextField(
-              controller: _dateController,
+              controller: _dateTimeController,
               readOnly: true,
               decoration: InputDecoration(
-                labelText: 'เลือกวันที่',
+                labelText: 'เลือกวันและเวลา',
                 prefixIcon: Icon(Icons.calendar_today),
               ),
-              onTap: _selectDate,
+              onTap: _selectDateTime,
             ),
             SizedBox(height: 16),
             btnSave(context),
@@ -90,74 +91,115 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
     );
   }
 
-  Future<void> _selectDate() async {
-    final DateTime? pickedDate = await showDatePicker(
+  Future<void> _selectDateTime() async {
+    DateTime? pickedDate = await showDatePicker(
       context: context,
-      initialDate: _selectedDate ?? DateTime.now(),
+      initialDate: _selectedDateTime ?? DateTime.now(),
       firstDate: DateTime(2000),
       lastDate: DateTime(2101),
     );
 
-    if (pickedDate != null && pickedDate != _selectedDate) {
-      setState(() {
-        _selectedDate = pickedDate;
-        _dateController.text = DateFormat('dd/MM/yyyy').format(_selectedDate!);
-      });
+    if (pickedDate != null) {
+      TimeOfDay? pickedTime = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.fromDateTime(_selectedDateTime ?? DateTime.now()),
+      );
+
+      if (pickedTime != null) {
+        DateTime finalDateTime = DateTime(
+          pickedDate.year,
+          pickedDate.month,
+          pickedDate.day,
+          pickedTime.hour,
+          pickedTime.minute,
+        );
+
+        setState(() {
+          _selectedDateTime = finalDateTime;
+          _dateTimeController.text =
+              DateFormat('dd/MM/yyyy (HH:mm)').format(finalDateTime);
+        });
+      }
     }
   }
 
   void _toggleCompletion() async {
-    TaskModel updatedTask = TaskModel(
-      id: widget.task.id,
-      title: widget.task.title,
-      dsp: widget.task.dsp,
-      date: widget.task.date,
-      iscompleted: !widget.task.iscompleted,
-    );
+    final User? user = _auth.currentUser;
+    if (user != null) {
+      if (user.uid != widget.task.userID) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text("คุณไม่สามารถแก้ไข task นี้ได้!"),
+        ));
+        return;
+      }
 
-    await db.setTask(task: updatedTask);
-    setState(() {
-      widget.task.iscompleted = !widget.task.iscompleted;
-      Navigator.of(context).pop();
-    });
+      TaskModel updatedTask = TaskModel(
+        id: widget.task.id,
+        title: widget.task.title,
+        dsp: widget.task.dsp,
+        date: widget.task.date,
+        iscompleted: !widget.task.iscompleted, // เปลี่ยนสถานะ
+        userID: user.uid,
+      );
+
+      await db.setTask(task: updatedTask);
+      setState(() {
+        widget.task.iscompleted = updatedTask.iscompleted;
+        Navigator.pop(context);
+      });
+    }
   }
 
   void _confirmDelete() async {
-    bool? confirmDelete = await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text("ลบ Task?"),
-        content: Text("คุณต้องการลบ Task นี้หรือไม่?"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text("ยกเลิก"),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text("ลบ"),
-          ),
-        ],
-      ),
-    );
-    if (confirmDelete == true) {
-      await db.deleteTask(task: widget.task);
-      Navigator.of(context).pop();
+    final User? user = _auth.currentUser;
+    if (user != null) {
+      if (user.uid != widget.task.userID) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text("คุณไม่สามารถลบ task นี้ได้!"),
+        ));
+        return;
+      }
+
+      bool? confirmDelete = await showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text("ลบ Task?"),
+          content: Text("คุณต้องการลบ Task นี้หรือไม่?"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text("ยกเลิก"),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text("ลบ"),
+            ),
+          ],
+        ),
+      );
+      if (confirmDelete == true) {
+        await db.deleteTask(task: widget.task);
+        Navigator.of(context).pop();
+      }
     }
   }
 
   Widget btnSave(BuildContext context) {
     return ElevatedButton(
       onPressed: () async {
-        TaskModel updatedTask = TaskModel(
-          id: widget.task.id,
-          title: _titleController.text,
-          dsp: _dspController.text,
-          date: _selectedDate ?? widget.task.date,
-          iscompleted: widget.task.iscompleted,
-        );
-        await db.setTask(task: updatedTask);
-        Navigator.of(context).pop();
+        final User? user = _auth.currentUser;
+        if (user != null) {
+          TaskModel updatedTask = TaskModel(
+            id: widget.task.id,
+            title: _titleController.text,
+            dsp: _dspController.text,
+            date: _selectedDateTime ?? widget.task.date,
+            iscompleted: widget.task.iscompleted,
+            userID: user.uid,
+          );
+          await db.setTask(task: updatedTask);
+          Navigator.of(context).pop();
+        }
       },
       child: Text("บันทึก"),
     );

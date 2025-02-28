@@ -6,6 +6,7 @@ class TaskModel {
   String dsp;
   DateTime date;
   bool iscompleted;
+  String userID;
 
 
   TaskModel({
@@ -13,7 +14,8 @@ class TaskModel {
     required this.title, 
     required this.dsp, 
     required this.date, 
-    required this.iscompleted
+    required this.iscompleted,
+    required this.userID,
     });
 
   factory TaskModel.formMap(Map<String, dynamic> task){
@@ -25,7 +27,8 @@ class TaskModel {
         title: task['title'], 
         dsp: task['description'],
         date: (task['due_date'] as Timestamp).toDate(),
-        iscompleted: task['is_completed']
+        iscompleted: task['is_completed'],
+        userID: task['userID'] ?? '',
         );
         return obj;
     }
@@ -38,7 +41,8 @@ class TaskModel {
         'title' : title,
         'description' : dsp,
         'due_date' : Timestamp.fromDate(date),
-        'is_completed': iscompleted
+        'is_completed': iscompleted,
+        'userID': userID
       };
       return data;
   }
