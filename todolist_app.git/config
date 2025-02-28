@@ -1,0 +1,11 @@
+[core]
+	repositoryformatversion = 0
+	filemode = false
+	bare = true
+	symlinks = false
+	ignorecase = true
+[remote "origin"]
+	url = https://github.com/AuPattavee1143/todolist_app.git
+[remote "new-origin"]
+	url = https://github.com/rmutr-chakawad/mini-project-AuPattavee1143.git
+	fetch = +refs/heads/*:refs/remotes/new-origin/*

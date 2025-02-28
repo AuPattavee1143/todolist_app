@@ -25,7 +25,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
       FirebaseFirestore.instance.collection('task').add({
         'title': _titleController.text,
         'description': _dspController.text,
-        'due_date': Timestamp.fromDate(_selectedDateTime!), // บันทึกวันและเวลา
+        'due_date': Timestamp.fromDate(_selectedDateTime!), 
         'is_completed': false,
         'userID': userID,
       }).then((docRef) {
@@ -108,7 +108,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
           TextField(
             controller: _dspController,
             decoration: InputDecoration(
-              labelText: "รายละเอียด",
+              labelText: "รายละเอียดS",
               prefixIcon: Icon(Icons.notes),
             ),
           ),
